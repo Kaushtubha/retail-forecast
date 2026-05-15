@@ -21,7 +21,11 @@ except Exception as e:
     model = None
 
 # ── 2. INIT DATABASE ──────────────────────────
-init_db()
+try:
+    init_db()
+    print("Database initialized!")
+except Exception as e:
+    print(f"Database init warning: {e}")
 
 # ── 3. FASTAPI APP ────────────────────────────
 app = FastAPI(
