@@ -77,18 +77,6 @@ function Dashboard() {
     });
   }, [token]);
 
-  const loadHistory = useCallback(async () => {
-    try {
-      setLoadingHistory(true);
-      const res = await api.get("/history");
-      setHistory(res.data.last_10 || []);
-    } catch (e) {
-      setError("Failed to load history.");
-    } finally {
-      setLoadingHistory(false);
-    }
-  }, [api]);
-
   useEffect(() => {
     document.body.classList.toggle("dark-theme", darkMode);
     document.body.classList.toggle("light-theme", !darkMode);
@@ -175,6 +163,18 @@ function Dashboard() {
       window.removeEventListener("resize", makeParticles);
     };
   }, []);
+
+  const loadHistory =useCallback(async () => {
+    try {
+      setLoadingHistory(true);
+      const res = await api.get("/history");
+      setHistory(res.data.last_10 || []);
+    } catch (e) {
+      setError("Failed to load history.");
+    } finally {
+      setLoadingHistory(false);
+    }
+  }, [api]);
 
   const handleChange = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -280,3 +280,225 @@ function Dashboard() {
             >
               <FiZap /> Predict
             </button>
+            <button
+              className={activeTab === "history" ? "tab active" : "tab"}
+              onClick={() => setActiveTab("history")}
+            >
+              <FiClock /> History
+            </button>
+            <button
+              className={activeTab === "insights" ? "tab active" : "tab"}
+              onClick={() => setActiveTab("insights")}
+            >
+              <FiActivity /> Insights
+            </button>
+          </nav>
+
+          <div className="topbar-actions">
+            <div className="user-chip">{userName}</div>
+            <button className="icon-btn" onClick={() => setDarkMode((v) => !v)} title="Toggle theme">
+              {darkMode ? <FiSun /> : <FiMoon />}
+            </button>
+            <button className="logout-btn" onClick={onLogout}>
+              <FiLogOut /> Logout
+            </button>
+          </div>
+        </header>
+
+        <section className="kpi-grid">
+          <div className="kpi-card glass">
+            <div className="kpi-label">Avg Sales</div>
+            <div className="kpi-value">{avgSales.toFixed(2)}</div>
+            <FiTrendingUp className="kpi-icon" />
+          </div>
+          <div className="kpi-card glass">
+            <div className="kpi-label">Total Predictions</div>
+            <div className="kpi-value">{history.length}</div>
+            <FiDatabase className="kpi-icon" />
+          </div>
+          <div className="kpi-card glass">
+            <div className="kpi-label">Critical Alerts</div>
+            <div className="kpi-value">{criticalAlerts}</div>
+            <FiShield className="kpi-icon" />
+          </div>
+          <div className="kpi-card glass">
+            <div className="kpi-label">Peak Sale</div>
+            <div className="kpi-value">{peakSale.toFixed(2)}</div>
+            <FiBarChart2 className="kpi-icon" />
+          </div>
+        </section>
+
+        {error ? <div className="error-banner">{error}</div> : null}
+
+        {activeTab === "predict" && (
+          <section className="content-grid">
+            <div className="panel glass form-panel">
+              <div className="panel-header">
+                <h2>Prediction Form</h2>
+                <p>Enter encoded features to forecast demand.</p>
+              </div>
+
+              <form className="predict-form" onSubmit={handlePredict}>
+                {Object.keys(initialForm).map((key) => (
+                  <label key={key} className="input-group">
+                    <span>{key}</span>
+                    <input
+                      type="number"
+                      step="any"
+                      value={form[key]}
+                      onChange={(e) => handleChange(key, e.target.value)}
+                      placeholder={key}
+                      required
+                    />
+                  </label>
+                ))}
+
+                <button className="primary-btn" type="submit" disabled={loadingPredict}>
+                  {loadingPredict ? "Predicting..." : "Generate Prediction"}
+                </button>
+              </form>
+            </div>
+
+            <div className="panel glass result-panel">
+              <div className="panel-header">
+                <h2>Forecast Result</h2>
+                <p>Model output and inventory recommendation.</p>
+              </div>
+
+              <div className="sales-ring">
+                <div className="ring-inner">
+                  <div className="ring-label">Predicted Sales</div>
+                  <div className="ring-value">
+                    {result ? Number(result.predicted_sales).toFixed(2) : "—"}
+                  </div>
+                </div>
+              </div>
+
+              <div className="result-card">
+                <div className="result-line">{getRecommendationText()}</div>
+                <div
+                  className="priority-pill"
+                  style={{
+                    color: getPriorityTone(result?.inventory?.priority),
+                    background: getPriorityBackground(result?.inventory?.priority),
+                    borderColor: getPriorityTone(result?.inventory?.priority),
+                  }}
+                >
+                  {result?.inventory?.priority || "No priority yet"}
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {activeTab === "history" && (
+          <section className="content-grid history-grid">
+            <div className="panel glass chart-panel">
+              <div className="panel-header">
+                <h2>Prediction Trend</h2>
+                <p>Last 10 saved predictions.</p>
+              </div>
+
+              <div className="chart-wrap">
+                <ResponsiveContainer width="100%" height={320}>
+                  <BarChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
+                    <XAxis dataKey="name" stroke="rgba(255,255,255,0.65)" />
+                    <YAxis stroke="rgba(255,255,255,0.65)" />
+                    <Tooltip
+                      contentStyle={{
+                        background: "rgba(12, 15, 28, 0.95)",
+                        border: "1px solid rgba(255,255,255,0.1)",
+                        borderRadius: 12,
+                        color: "#fff",
+                      }}
+                    />
+                    <Bar dataKey="sales" radius={[10, 10, 0, 0]}>
+                      {chartData.map((entry, index) => (
+                        <Cell key={index} fill={getPriorityTone(entry.priority)} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            <div className="panel glass table-panel">
+              <div className="panel-header">
+                <h2>History Table</h2>
+                <p>Saved predictions from PostgreSQL.</p>
+              </div>
+
+              <div className="table-wrap">
+                {loadingHistory ? (
+                  <div className="loading-state">Loading history...</div>
+                ) : (
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>ID</th>
+                        <th>Predicted Sales</th>
+                        <th>Recommendation</th>
+                        <th>Priority</th>
+                        <th>Created At</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {history.map((row) => (
+                        <tr key={row.id}>
+                          <td>{row.id}</td>
+                          <td>{Number(row.predicted_sales).toFixed(2)}</td>
+                          <td>{row.recommendation}</td>
+                          <td>
+                            <span
+                              className="priority-pill compact"
+                              style={{
+                                color: getPriorityTone(row.priority),
+                                background: getPriorityBackground(row.priority),
+                                borderColor: getPriorityTone(row.priority),
+                              }}
+                            >
+                              {row.priority}
+                            </span>
+                          </td>
+                          <td>{row.created_at}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+          </section>
+        )}
+
+        {activeTab === "insights" && (
+          <section className="insight-grid">
+            <div className="info-card glass">
+              <FiCpu className="info-icon" />
+              <h3>Model Details</h3>
+              <p>CatBoost regression is the best model and is saved as model.pkl for serving predictions.</p>
+            </div>
+            <div className="info-card glass">
+              <FiDatabase className="info-icon" />
+              <h3>Data Pipeline</h3>
+              <p>BigMart data is cleaned, encoded, feature engineered, and written to cleaned_train.csv before training.</p>
+            </div>
+            <div className="info-card glass">
+              <FiActivity className="info-icon" />
+              <h3>Tech Stack</h3>
+              <p>React, Recharts, FastAPI, PostgreSQL, pandas, scikit-learn, and CatBoost power the full stack app.</p>
+            </div>
+            <div className="info-card glass">
+              <FiZap className="info-icon" />
+              <h3>Feature Importance</h3>
+              <p>MRP, outlet type, visibility, and outlet age typically drive the strongest sales patterns.</p>
+            </div>
+          </section>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default Dashboard;
