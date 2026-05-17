@@ -1,4 +1,4 @@
-import joblib  # Using joblib instead of pickle for better compatibility
+import joblib
 import numpy as np
 from fastapi import FastAPI, Depends
 from pydantic import BaseModel
@@ -7,7 +7,6 @@ from database import SessionLocal, Prediction, init_db
 from fastapi.middleware.cors import CORSMiddleware
 import os
 
-# ── 1. LOAD MODEL ─────────────────────────────
 MODEL_PATH = os.getenv("MODEL_PATH", "data/model.pkl")
 
 try:
@@ -17,30 +16,26 @@ except Exception as e:
     print(f"Error loading model: {e}")
     model = None
 
-# ── 2. INIT DATABASE ──────────────────────────
 try:
     init_db()
     print("Database initialized!")
 except Exception as e:
     print(f"Database init warning: {e}")
 
-# ── 3. FASTAPI APP ────────────────────────────
 app = FastAPI(
     title="JEYAS RetailIQ API",
     description="Predicts sales and gives inventory recommendations",
     version="2.0.0"
 )
 
-# ✅ FIXED CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://retail-forecast-q2qs.vercel.app"],
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ── 4. DATABASE SESSION ───────────────────────
 def get_db():
     db = SessionLocal()
     try:
@@ -48,7 +43,6 @@ def get_db():
     finally:
         db.close()
 
-# ── 5. INPUT SCHEMA ───────────────────────────
 class PredictRequest(BaseModel):
     Item_Weight: float
     Item_Fat_Content: int
@@ -63,7 +57,6 @@ class PredictRequest(BaseModel):
     Visibility_Was_Zero: int
     MRP_Category: int
 
-# ── 6. INVENTORY LOGIC ────────────────────────
 def get_inventory_recommendation(predicted_sales: float) -> dict:
     if predicted_sales < 500:
         return {"recommendation": "Low Stock", "units_to_stock": 10, "priority": "LOW"}
@@ -74,7 +67,6 @@ def get_inventory_recommendation(predicted_sales: float) -> dict:
     else:
         return {"recommendation": "Very High Stock", "units_to_stock": 100, "priority": "CRITICAL"}
 
-# ── 7. ROUTES ─────────────────────────────────
 @app.get("/")
 def root():
     return {
