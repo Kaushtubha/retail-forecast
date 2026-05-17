@@ -25,7 +25,7 @@ import {
 } from "react-icons/fi";
 import "./Dashboard.css";
 
-const API_BASE = "http://localhost:8000";
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 const initialForm = {
   Item_Weight: "",
@@ -86,9 +86,11 @@ function Dashboard() {
     try {
       setLoadingHistory(true);
       const res = await api.get("/history");
-      setHistory(res.data.last_10 || []);
+      const data = res?.data?.last_10;
+      setHistory(Array.isArray(data) ? data : []);
     } catch (e) {
       setError("Failed to load history.");
+      setHistory([]);
     } finally {
       setLoadingHistory(false);
     }
@@ -202,7 +204,7 @@ function Dashboard() {
       };
 
       const res = await api.post("/predict", payload);
-      setResult(res.data);
+      setResult(res?.data || null);
       setActiveTab("predict");
       await loadHistory();
     } catch (e) {
@@ -218,28 +220,32 @@ function Dashboard() {
   };
 
   const avgSales = useMemo(() => {
-    if (!history.length) return 0;
+    if (!Array.isArray(history) || !history.length) return 0;
     return (
-      history.reduce((sum, row) => sum + Number(row.predicted_sales || 0), 0) /
+      history.reduce((sum, row) => sum + Number(row?.predicted_sales || 0), 0) /
       history.length
     );
   }, [history]);
 
   const criticalAlerts = useMemo(
-    () => history.filter((x) => String(x.priority).toUpperCase() === "CRITICAL").length,
+    () =>
+      Array.isArray(history)
+        ? history.filter((x) => String(x?.priority || "").toUpperCase() === "CRITICAL").length
+        : 0,
     [history]
   );
 
   const peakSale = useMemo(() => {
-    if (!history.length) return 0;
-    return Math.max(...history.map((x) => Number(x.predicted_sales || 0)));
+    if (!Array.isArray(history) || !history.length) return 0;
+    return Math.max(...history.map((x) => Number(x?.predicted_sales || 0)));
   }, [history]);
 
   const chartData = useMemo(() => {
-    return [...history].slice().reverse().map((item, idx) => ({
+    if (!Array.isArray(history)) return [];
+    return [...history].reverse().map((item, idx) => ({
       name: `#${idx + 1}`,
-      sales: Number(item.predicted_sales || 0),
-      priority: String(item.priority || "").toUpperCase(),
+      sales: Number(item?.predicted_sales || 0),
+      priority: String(item?.priority || "").toUpperCase(),
     }));
   }, [history]);
 
@@ -255,7 +261,7 @@ function Dashboard() {
 
   const getRecommendationText = () => {
     if (!result?.inventory) return "Awaiting prediction";
-    return `${result.inventory.recommendation} • ${result.inventory.units_to_stock} units • ${result.inventory.priority}`;
+    return `${result.inventory.recommendation || ""} • ${result.inventory.units_to_stock ?? ""} units • ${result.inventory.priority || ""}`;
   };
 
   return (
@@ -369,7 +375,9 @@ function Dashboard() {
                 <div className="ring-inner">
                   <div className="ring-label">Predicted Sales</div>
                   <div className="ring-value">
-                    {result ? Number(result.predicted_sales).toFixed(2) : "—"}
+                    {result && result.predicted_sales != null
+                      ? Number(result.predicted_sales).toFixed(2)
+                      : "—"}
                   </div>
                 </div>
               </div>
@@ -432,6 +440,8 @@ function Dashboard() {
               <div className="table-wrap">
                 {loadingHistory ? (
                   <div className="loading-state">Loading history...</div>
+                ) : history.length === 0 ? (
+                  <div className="loading-state">No predictions yet.</div>
                 ) : (
                   <table>
                     <thead>
@@ -445,23 +455,23 @@ function Dashboard() {
                     </thead>
                     <tbody>
                       {history.map((row) => (
-                        <tr key={row.id}>
-                          <td>{row.id}</td>
-                          <td>{Number(row.predicted_sales).toFixed(2)}</td>
-                          <td>{row.recommendation}</td>
+                        <tr key={row?.id ?? Math.random()}>
+                          <td>{row?.id ?? "—"}</td>
+                          <td>{row?.predicted_sales != null ? Number(row.predicted_sales).toFixed(2) : "—"}</td>
+                          <td>{row?.recommendation ?? "—"}</td>
                           <td>
                             <span
                               className="priority-pill compact"
                               style={{
-                                color: getPriorityTone(row.priority),
-                                background: getPriorityBackground(row.priority),
-                                borderColor: getPriorityTone(row.priority),
+                                color: getPriorityTone(row?.priority),
+                                background: getPriorityBackground(row?.priority),
+                                borderColor: getPriorityTone(row?.priority),
                               }}
                             >
-                              {row.priority}
+                              {row?.priority ?? "—"}
                             </span>
                           </td>
-                          <td>{row.created_at}</td>
+                          <td>{row?.created_at ?? "—"}</td>
                         </tr>
                       ))}
                     </tbody>
