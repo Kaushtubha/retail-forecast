@@ -8,8 +8,6 @@ from fastapi.middleware.cors import CORSMiddleware
 import os
 
 # ── 1. LOAD MODEL ─────────────────────────────
-# ✅ FIXED: Path changed from '../data/model.pkl' to 'data/model.pkl'
-# This matches the COPY data /app/data instruction in your Dockerfile
 MODEL_PATH = os.getenv("MODEL_PATH", "data/model.pkl")
 
 try:
@@ -17,7 +15,6 @@ try:
     print("Model loaded successfully!")
 except Exception as e:
     print(f"Error loading model: {e}")
-    # Fallback for local development if needed
     model = None
 
 # ── 2. INIT DATABASE ──────────────────────────
@@ -37,7 +34,7 @@ app = FastAPI(
 # ✅ FIXED CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["https://retail-forecast-q2qs.vercel.app"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -93,7 +90,6 @@ def health():
         "database": "Connected"
     }
 
-# ADDED FOR STEP 9: MLOps Metrics
 @app.get("/metrics")
 async def get_metrics(db: Session = Depends(get_db)):
     total = db.query(Prediction).count()
@@ -108,7 +104,6 @@ def predict(request: PredictRequest, db: Session = Depends(get_db)):
     if model is None:
         return {"error": "Model not loaded"}
 
-    # Build features
     features = np.array([[
         request.Item_Weight,
         request.Item_Fat_Content,
@@ -124,11 +119,9 @@ def predict(request: PredictRequest, db: Session = Depends(get_db)):
         request.MRP_Category
     ]])
 
-    # Predict
     predicted_sales = float(model.predict(features)[0])
     inventory = get_inventory_recommendation(predicted_sales)
 
-    # Save to DB
     record = Prediction(
         item_mrp=request.Item_MRP,
         outlet_type=request.Outlet_Type,
